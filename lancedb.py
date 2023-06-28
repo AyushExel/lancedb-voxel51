@@ -1,3 +1,4 @@
+import os
 import logging
 import numpy as np
 import fiftyone.core.utils as fou
@@ -15,6 +16,7 @@ pa = fou.lazy_import("pyarrow")
 pd = fou.lazy_import("pandas")
 
 _SUPPORTED_METRICS = ("cosine", "l2")
+
 logger = logging.getLogger(__name__)
 
 class LanceDBSimilarityConfig(SimilarityConfig):
@@ -26,7 +28,7 @@ class LanceDBSimilarityConfig(SimilarityConfig):
         supports_prompts=None,
         table_name=None,
         metric=None,
-        uri="~/test-fiftyone",
+        uri="/tmp/lancedb",
         **kwargs,
     ):
         if metric is not None and metric not in _SUPPORTED_METRICS:
@@ -34,7 +36,6 @@ class LanceDBSimilarityConfig(SimilarityConfig):
                 "Unsupported metric '%s'. Supported values are %s"
                 % (metric, _SUPPORTED_METRICS)
             )
-
         super().__init__(
             embeddings_field=embeddings_field,
             model=model,
@@ -43,7 +44,7 @@ class LanceDBSimilarityConfig(SimilarityConfig):
             **kwargs,
         )
         self.table_name = table_name
-        self.uri = uri
+        self.uri = os.path.abspath(uri)
         self.metric = metric
 
     @property
@@ -56,7 +57,7 @@ class LanceDBSimilarityConfig(SimilarityConfig):
         """A maximum k value for nearest neighbor queries, or None if there is
         no limit.
         """
-        return None # to check
+        return None # TODO: check this
 
     @property
     def supports_least_similarity(self):
@@ -65,12 +66,7 @@ class LanceDBSimilarityConfig(SimilarityConfig):
 
     @property
     def supported_aggregations(self):
-        """A tuple of supported values for the ``aggregation`` parameter of the
-        backend's
-        :meth:`sort_by_similarity() <SimilarityIndex.sort_by_similarity>` and
-        :meth:`_kneighbors() <SimilarityIndex._kneighbors>` methods.
-        """
-        return False
+        return ("mean",)
 
 class LanceDBSimilarity(Similarity):
     """LanceDB similarity factory.
@@ -112,7 +108,6 @@ class LanceDBSimilarityIndex(SimilarityIndex):
             table = db.open_table(self.config.table_name)
         else:
             table = None
-
         self._db = db
         self._table = table
         self._table_name = self.config.table_name
@@ -145,7 +140,6 @@ class LanceDBSimilarityIndex(SimilarityIndex):
         warn_existing=False,
         reload=True,
     ):
-    # TODO: Fix this
         """Adds the given embeddings to the index.
 
         Args:
@@ -221,7 +215,6 @@ class LanceDBSimilarityIndex(SimilarityIndex):
         embeddings = pa.array(embeddings.reshape(-1), type=pa.float32())
         embeddings = pa.FixedSizeListArray.from_arrays(embeddings, dim)
         sample_ids = list(sample_ids)
-        import pdb;pdb.set_trace()
         pa_table = pa.Table.from_arrays([ids,sample_ids, embeddings], names=["id", "sample_id", "vector"])
         self._table = self._db.create_table(self.config.table_name, pa_table, mode="overwrite")
 
@@ -307,7 +300,6 @@ class LanceDBSimilarityIndex(SimilarityIndex):
 
         pd_table = self._table.to_pandas()
         found_embeddings, found_sample_ids, found_label_ids, missing_ids = [], [], [], []
-        top_k =  100   # min(batch_size, self.config.max_k)
         if sample_ids is not None and self.config.patches_field is not None:
             sample_ids = sample_ids if isinstance(sample_ids, list) else [sample_ids]
             df = pd_table.set_index("sample_id")
@@ -405,7 +397,7 @@ class LanceDBSimilarityIndex(SimilarityIndex):
 
             results = results.limit(k).to_df().query("id in @index_ids")
             if reverse:
-                results = results.sort_values("score", ascending=False)
+                results = results.iloc[::-1]
 
             ids.append(results.id.tolist())
             if return_dists:
@@ -448,7 +440,3 @@ class LanceDBSimilarityIndex(SimilarityIndex):
     @classmethod
     def _from_dict(cls, d, samples, config, brain_key):
         return cls(samples, config, brain_key)
-
-
-        
-
