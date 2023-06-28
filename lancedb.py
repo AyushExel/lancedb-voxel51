@@ -20,6 +20,24 @@ _SUPPORTED_METRICS = ("cosine", "l2")
 logger = logging.getLogger(__name__)
 
 class LanceDBSimilarityConfig(SimilarityConfig):
+    """Configuration for a LanceDB similarity instance.
+
+    Args:
+        embeddings_field (None): the name of the embeddings field to use
+        model (None): the name of the model to use
+        model (None): the :class:`fiftyone.core.models.Model` or name of the
+            zoo model that was used to compute embeddings, if known
+        patches_field (None): the sample field defining the patches being
+            analyzed, if any
+        supports_prompts (None): whether this run supports prompt queries
+        table_name (None): the name of the lancedb table to use
+        metric (None): the embedding distance metric to use when creating a
+            new index. Supported values are
+            ``("cosine", "l2")`` (default is ``"l2"``)
+        uri ("/tmp/lancedb"): the URI of the lancedb database to use
+        **kwargs: keyword arguments for :class:`SimilarityConfig`
+    """
+    
     def __init__(
         self,
         embeddings_field=None,
